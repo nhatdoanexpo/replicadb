@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  postgres-master:
+    image: postgres:15.0
+    container_name: postgres-1
+    environment:
+      POSTGRES_USER: postgresadmin
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: postgresdb
+      PGDATA: "/data"
+    volumes:
+      - ./postgres-1/pgdata:/data
+      - ./postgres-1/config:/config
+      - ./postgres-1/archive:/mnt/server/archive
+      - ./postgres-1/initdata/replication_user.sql:/docker-entrypoint-initdb.d/replication_user.sql
+    ports:
+      - "6000:5432"
+    command: -c 'config_file=/config/postgresql.conf'
+    restart: unless-stopped

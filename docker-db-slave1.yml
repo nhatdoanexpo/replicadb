@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  pg_backup:
+    image: postgres:15.0
+    container_name: pg_backup
+    volumes:
+      - ./postgres-2/pgdata:/data
+    command: >
+      bash -c "
+      until pg_isready -h vetgos.ddns.net -p 6000 -U replication_user; do
+        echo 'Waiting for server master to be ready...'
+        sleep 2
+      done &&
+      echo 'server master is ready.' &&
+      pg_basebackup -h vetgos.ddns.net -p 6000 -U replication_user -D /data/ -Fp -Xs -R &&
+      echo 'Backup completed successfully.' &&
+      touch /data/backup_done.flag"
+    environment:
+      PGPASSWORD: admin123
+
+  postgres-slave-1:
+    image: postgres:15.0
+    container_name: postgres-slave-1
+    depends_on:
+      - pg_backup
+    environment:
+      POSTGRES_USER: postgresadmin
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: postgresdb
+      PGDATA: "/data"
+    volumes:
+      - ./postgres-2/pgdata:/data
+      - ./postgres-2/config:/config
+      - ./postgres-2/archive:/mnt/server/archive
+    ports:
+      - "6001:5432"
+    command: >
+      bash -c "
+      while [ ! -f /data/backup_done.flag ]; do
+        echo 'Waiting for backup to complete...'
+        sleep 2
+      done &&
+      rm /data/backup_done.flag &&
+      docker-entrypoint.sh postgres -c config_file=/config/postgresql.conf"
+    restart: unless-stopped
